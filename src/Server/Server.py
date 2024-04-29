@@ -92,21 +92,31 @@ def can_vote(conn, user, voter):
 
 # Add a vote to the database
 def add_vote(conn, user, voter):
-    cur = conn.cursor()
-    cur.execute("INSERT INTO votes(user,voter,date) VALUES(?,?,?)", (user, voter, datetime.now().strftime('%Y-%m')))
-    conn.commit()
-
-    # Increment the votes_received value for the user
-    increment_votes_received(conn, user)
-
-    return can_vote(conn, user, voter)
+    if can_vote(conn, user, voter):
+        cur = conn.cursor()
+        cur.execute("INSERT INTO votes(user,voter,date) VALUES(?,?,?)", (user, voter, datetime.now().strftime('%Y-%m')))
+        conn.commit()
+        return True
+    return False
 
 
+# Process a vote
 # Process a vote
 def process_vote(user, voter):
     conn = create_connection()
     message = None
     success = False
+
+    # Check if the voter is not voting for themselves
+    if user == voter:
+        return False, 'You cannot vote for yourself.'
+
+    # Check if the voter and the user are members of the channel
+    # Replace 'channel_id' with the ID of your channel
+    channel_members = slack_client.conversations_members(channel='channel_id')['members']
+    if user not in channel_members or voter not in channel_members:
+        return False, 'Both the voter and the user must be members of the channel.'
+
     if add_vote(conn, user, voter):
         # Increment the votes_received value for the user
         increment_votes_received(conn, user)
@@ -189,7 +199,7 @@ def vote():
         return jsonify(response_type='in_channel', text=message), 200
     else:
         conn.close()
-        return jsonify(response_type='in_channel', text=message), 200
+        return jsonify(response_type='ephemeral', text='You cannot vote at this time.'), 200
 
 
 if __name__ == '__main__':

@@ -141,10 +141,10 @@ if __name__ == '__main__':
     # Create a database connection
     conn = create_connection()
     # Clear all votes from the database
-    #clear_votes(conn)
+    clear_votes(conn)
     # Reset the database
     reset_votes(conn)
-    #delete_columns(conn)
-    #recreate_table(conn)
+    delete_columns(conn)
+    recreate_table(conn)
     # Close the database connection
     conn.close()
