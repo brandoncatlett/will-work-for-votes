@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DdlMappings">
+    <mapping uuid="65f7af78-6df1-4867-b87c-2a0a5d25a4b4" name="votes.db Mapping">
+      <data-sources db="74337947-9825-4ae4-8441-63d4621262e8" ddl="591efe6a-26cb-4a2d-9ca4-18156cee5042" />
+    </mapping>
+  </component>
+  <component name="SqlDataSourceStorage">
+    <option name="dataSources">
+      <list>
+        <State>
+          <option name="id" value="ff39bf61-22d0-4349-a4ce-d94950d24195" />
+          <option name="name" value="votes.db (DDL)" />
+          <option name="dbmsName" value="SQLITE" />
+          <option name="urls">
+            <array />
+          </option>
+          <option name="outLayout" value="File per object by schema.groovy" />
+        </State>
+      </list>
+    </option>
+  </component>
+</project>
