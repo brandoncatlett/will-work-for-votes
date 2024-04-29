@@ -87,6 +87,30 @@ def reset_database(conn):
     except Exception as e:
         print(f"An error occurred while resetting the database: {e}")
 
+
+# Reset the votes remaining for all users
+def reset_votes(conn):
+    # Check if conn is a valid SQLite connection object
+    if not isinstance(conn, sqlite3.Connection):
+        raise ValueError("Invalid connection object.")
+
+    try:
+        cur = conn.cursor()
+        # Update the remaining_votes for all users to 3
+        cur.execute("UPDATE slack_users SET remaining_votes = 3")
+        conn.commit()
+
+        # Check if the remaining_votes value for all users has been updated to 3
+        cur.execute("SELECT remaining_votes FROM slack_users")
+        votes = cur.fetchall()
+        if all(vote[0] == 3 for vote in votes):
+            print(f'All votes have been reset to 3 for all users.')
+        else:
+            print("Error: Not all remaining_votes values were updated correctly.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 def recreate_table(conn):
     # Check if conn is a valid SQLite connection object
     if not isinstance(conn, sqlite3.Connection):
@@ -117,10 +141,10 @@ if __name__ == '__main__':
     # Create a database connection
     conn = create_connection()
     # Clear all votes from the database
-    clear_votes(conn)
+    #clear_votes(conn)
     # Reset the database
-    #reset_database(conn)
+    reset_votes(conn)
     #delete_columns(conn)
-    recreate_table(conn)
+    #recreate_table(conn)
     # Close the database connection
     conn.close()

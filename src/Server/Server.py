@@ -84,6 +84,9 @@ def process_vote(user, voter):
     message = None
     success = False
     if add_vote(conn, user, voter):
+        # Increment the votes_received value for the user
+        increment_votes_received(conn, user)
+
         # List of possible messages
         messages = [
             f'{user}! Someone thinks you are doing a great job!',
@@ -99,6 +102,34 @@ def process_vote(user, voter):
     return success, message
 
 
+# Increment the votes received for a user
+# That's how you win!
+def increment_votes_received(conn, username):
+    # Check if conn is a valid SQLite connection object
+    if not isinstance(conn, sqlite3.Connection):
+        raise ValueError("Invalid connection object.")
+
+    try:
+        cur = conn.cursor()
+        # Retrieve the current votes_received value
+        cur.execute("SELECT votes_received FROM slack_users WHERE id=?", (username,))
+        votes_received_before = cur.fetchone()[0]
+
+        # Increment the votes_received value
+        cur.execute("UPDATE slack_users SET votes_received = votes_received + 1 WHERE id=?", (username,))
+        conn.commit()
+
+        # Check if the votes_received value has been incremented correctly
+        cur.execute("SELECT votes_received FROM slack_users WHERE id=?", (username,))
+        votes_received_after = cur.fetchone()[0]
+        if votes_received_after == votes_received_before + 1:
+            print(f'votes_received value for user {username} has been incremented correctly.')
+        else:
+            print("Error: votes_received value was not incremented correctly.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 # root route handling
 @app.route('/', methods=['POST'])
 def root():
@@ -111,6 +142,12 @@ def vote():
     conn = create_connection()
     username = request.form.get('text')
     voter = request.form.get('user_name')
+
+    # Data validation
+    if not username or not isinstance(username, str):
+        return jsonify(response_type='ephemeral', text='Invalid username.'), 400
+    if not voter or not isinstance(voter, str):
+        return jsonify(response_type='ephemeral', text='Invalid voter.'), 400
 
     # Check if the user exists in the slack_users table
     cur = conn.cursor()
