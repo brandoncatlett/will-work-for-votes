@@ -92,12 +92,14 @@ def can_vote(conn, user, voter):
 
 # Add a vote to the database
 def add_vote(conn, user, voter):
-    if can_vote(conn, user, voter):
-        cur = conn.cursor()
-        cur.execute("INSERT INTO votes(user,voter,date) VALUES(?,?,?)", (user, voter, datetime.now().strftime('%Y-%m')))
-        conn.commit()
-        return True
-    return False
+    cur = conn.cursor()
+    cur.execute("INSERT INTO votes(user,voter,date) VALUES(?,?,?)", (user, voter, datetime.now().strftime('%Y-%m')))
+    conn.commit()
+
+    # Increment the votes_received value for the user
+    increment_votes_received(conn, user)
+
+    return can_vote(conn, user, voter)
 
 
 # Process a vote
