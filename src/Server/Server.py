@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from slack_sdk import WebClient
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
 import certifi
 import requests
 import random
@@ -18,6 +20,26 @@ dbPath = '/Users/brandoncatlett/PycharmProjects/will-work-for-votes/src/Database
 # Generate a slack bot to send messages
 slack_client = WebClient(token='xoxb-7048517361889-7035748868867-bfZIybQ2dbhAoVVTU79BmUv5')
 
+
+# Reset the votes on a background schedule
+def reset_votes():
+    conn = create_connection()
+    cur = conn.cursor()
+
+    # Find the user with the most votes_received
+    cur.execute("SELECT id, MAX(votes_received) FROM slack_users")
+    user, max_votes = cur.fetchone()
+    print(f'User {user} had the most votes with a total of {max_votes} votes.')
+
+    # Reset the votes
+    cur.execute("UPDATE slack_users SET remaining_votes = 3, votes_received = 0")
+    conn.commit()
+    print(f'All votes have been reset to 3 for all users at {datetime.now()}')
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(reset_votes, 'cron', day=1)
+scheduler.start()
 
 # Create a connection to the database
 def create_connection():
@@ -165,7 +187,7 @@ def vote():
         return jsonify(response_type='in_channel', text=message), 200
     else:
         conn.close()
-        return jsonify(response_type='ephemeral', text='You cannot vote at this time.'), 200
+        return jsonify(response_type='in_channel', text=message), 200
 
 
 if __name__ == '__main__':
