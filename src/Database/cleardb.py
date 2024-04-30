@@ -48,7 +48,31 @@ def create_connection():
 
 app = Flask(__name__)
 
-# Clear all votes from the database
+
+# Reset the Votes_Receieved for all users to 0
+def reset_votes_received(conn):
+    # Check if conn is a valid SQLite connection object
+    if not isinstance(conn, sqlite3.Connection):
+        print("Invalid connection object.")
+        return
+
+    try:
+        cur = conn.cursor()
+        # Update the votes_received for all users to 0
+        cur.execute("UPDATE slack_users SET votes_received = 0")
+        conn.commit()
+
+        # Verify that the votes_received value for all users has been updated to 0
+        cur.execute("SELECT votes_received FROM slack_users")
+        votes = cur.fetchall()
+        if all(vote[0] == 0 for vote in votes):
+            print('All votes_received have been reset to 0 for all users.')
+        else:
+            print("Error: Not all votes_received values were updated correctly.")
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e}")
+
+# Clear all entries from the votes database
 def clear_votes(conn):
     try:
         cur = conn.cursor()
@@ -89,7 +113,7 @@ def reset_database(conn):
 
 
 # Reset the votes remaining for all users
-def reset_votes(conn):
+def reset_votes_remaining(conn, votecount):
     # Check if conn is a valid SQLite connection object
     if not isinstance(conn, sqlite3.Connection):
         raise ValueError("Invalid connection object.")
@@ -97,7 +121,7 @@ def reset_votes(conn):
     try:
         cur = conn.cursor()
         # Update the remaining_votes for all users to 3
-        cur.execute("UPDATE slack_users SET remaining_votes = 3")
+        cur.execute("UPDATE slack_users SET remaining_votes = ?", (votecount, ))
         conn.commit()
 
         # Check if the remaining_votes value for all users has been updated to 3
@@ -111,6 +135,7 @@ def reset_votes(conn):
         print(f"An error occurred: {e}")
 
 
+# Delete columns from the slack_users table
 def recreate_table(conn):
     # Check if conn is a valid SQLite connection object
     if not isinstance(conn, sqlite3.Connection):
@@ -131,10 +156,43 @@ def recreate_table(conn):
         c.execute(sql_create_new_table)
     except sqlite3.Error as e:
         print(f"An error occurred: {e}")
-    finally:
-        # Close the database connection
-        if conn:
-            conn.close()
+
+
+# Clear all entries from the slack_users table
+def clear_slack_users(conn):
+    # Check if conn is a valid SQLite connection object
+    if not isinstance(conn, sqlite3.Connection):
+        raise ValueError("Invalid connection object.")
+
+    # Check if the connection is open
+    if conn:
+        try:
+            cur = conn.cursor()
+            # Count the number of records before deletion
+            cur.execute("SELECT COUNT(*) FROM slack_users")
+            count_before = cur.fetchone()[0]
+            print(f"Number of records before deletion: {count_before}")
+
+            # Delete the records
+            print("Deleting records...")
+            cur.execute("DELETE FROM slack_users")
+            conn.commit()
+            print("Records deleted.")
+
+            # Count the number of records after deletion
+            cur.execute("SELECT COUNT(*) FROM slack_users")
+            count_after = cur.fetchone()[0]
+            print(f"Number of records after deletion: {count_after}")
+
+            # Verify that all records have been deleted
+            if count_after == 0:
+                print("All records have been successfully deleted.")
+            else:
+                print("Not all records were deleted. Please check the database.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+    else:
+        print("The database connection is closed.")
 
 
 if __name__ == '__main__':
@@ -143,8 +201,10 @@ if __name__ == '__main__':
     # Clear all votes from the database
     clear_votes(conn)
     # Reset the database
-    reset_votes(conn)
+    reset_votes_remaining(conn, 5)
+    reset_votes_received(conn)
     delete_columns(conn)
     recreate_table(conn)
+    clear_slack_users(conn)
     # Close the database connection
     conn.close()

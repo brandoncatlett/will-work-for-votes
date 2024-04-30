@@ -18,7 +18,7 @@ ssl_context.load_verify_locations(certifi.where())
 # Path to the database
 dbPath = '/Users/brandoncatlett/PycharmProjects/will-work-for-votes/src/Database/votes.db'
 # Generate a slack bot to send messages
-slack_client = WebClient(token='xoxb-7048517361889-7035748868867-bfZIybQ2dbhAoVVTU79BmUv5')
+slack_client = WebClient(token='xoxb-7048517361889-7034007566838-I4CULnF0OdajSjKWyRtvehrw')
 
 
 # Reset the votes on a background schedule
@@ -100,26 +100,57 @@ def add_vote(conn, user, voter):
     return False
 
 
-# Process a vote
+# Decrement the remaining_votes value for a voter
+def decrement_remaining_votes(conn, voter):
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE slack_users SET remaining_votes = remaining_votes - 1 WHERE id=?", (voter,))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e}")
+
+
 # Process a vote
 def process_vote(user, voter):
     conn = create_connection()
     message = None
     success = False
 
-    # Check if the voter is not voting for themselves
+    # Check if the voter is voting for themselves
     if user == voter:
+        print("Voter is trying to vote for themselves.")
         return False, 'You cannot vote for yourself.'
 
-    # Check if the voter and the user are members of the channel
-    # Replace 'channel_id' with the ID of your channel
-    channel_members = slack_client.conversations_members(channel='channel_id')['members']
-    if user not in channel_members or voter not in channel_members:
-        return False, 'Both the voter and the user must be members of the channel.'
+    # Check if the voter has any remaining votes
+    cur = conn.cursor()
+    # Print all ids in the slack_users table
+    cur.execute("SELECT id FROM slack_users")
+    ids = cur.fetchall()
+    print(f"All ids in the slack_users table: {ids}")
+    # Use the TRIM() function to remove whitespace from the voter value and the id in the slack_users table
+    cur.execute("SELECT remaining_votes FROM slack_users WHERE TRIM(id)=?", (voter.strip(),))
+    row = cur.fetchone()
+    if row is None:
+        print("Voter does not exist.")
+        return False, 'Voter does not exist.'
+    remaining_votes = row[0]
+    if remaining_votes <= 0:
+        print("Voter has no remaining votes.")
+        return False, 'You have no remaining votes.'
+
+    # Check if the voter is a member of the correct channel
+    response = slack_client.conversations_members(channel='C070V6LELJJ')
+    members = response["members"]
+    if voter not in members:
+        print("Voter is not a member of the correct channel.")
+        return False, 'You are not a member of the correct channel.'
 
     if add_vote(conn, user, voter):
         # Increment the votes_received value for the user
         increment_votes_received(conn, user)
+
+        # Decrement the remaining_votes value for the voter
+        decrement_remaining_votes(conn, voter)
 
         # List of possible messages
         messages = [
@@ -132,6 +163,8 @@ def process_vote(user, voter):
         message = random.choice(messages)
 
         success = True
+    else:
+        print("add_vote() returned False.")
     conn.close()
     return success, message
 
@@ -179,9 +212,9 @@ def vote():
 
     # Data validation
     if not username or not isinstance(username, str):
-        return jsonify(response_type='ephemeral', text='Invalid username.'), 400
+        return jsonify(response_type='ephemeral', channel='C070V6LELJJ', text='Invalid username.'), 400
     if not voter or not isinstance(voter, str):
-        return jsonify(response_type='ephemeral', text='Invalid voter.'), 400
+        return jsonify(response_type='ephemeral', channel='C070V6LELJJ', text='Invalid voter.'), 400
 
     # Check if the user exists in the slack_users table
     cur = conn.cursor()
@@ -192,14 +225,23 @@ def vote():
     if not user_exists:
         add_new_user(conn, username)
 
-    success, message = process_vote(username, voter)
-    if success:
-        # Send a message to a specific channel
+    try:
+        success, message = process_vote(username, voter)
+        if not success:
+            raise ValueError('Vote processing failed.')
+    except ValueError as e:
+        print(e)
+        # Handle the error as needed
         conn.close()
-        return jsonify(response_type='in_channel', text=message), 200
+        return jsonify(response_type='ephemeral', text=str(e)), 400
     else:
-        conn.close()
-        return jsonify(response_type='ephemeral', text='You cannot vote at this time.'), 200
+        if success:
+            # Send a message to a specific channel
+            conn.close()
+            return jsonify(channel='C070V6LELJJ', text=message), 200
+        else:
+            conn.close()
+            return jsonify(response_type='ephemeral', text='You cannot vote at this time.'), 200
 
 
 if __name__ == '__main__':
